@@ -10,12 +10,15 @@ import { mockTableData } from '@/data/transformerMockData';
 import { OutputFormat } from '@/types/enums';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useToast } from '@/hooks/use-toast';
+import { parseFile, getFileType } from '@/lib/fileParser';
+import { transformData } from '@/lib/dataTransformer';
+import { saveTransformation } from '@/services/transformationService';
 
 export function TransformPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [previewData, setPreviewData] = useState(mockTableData);
+  const [previewData, setPreviewData] = useState<Record<string, any>[]>(mockTableData);
   const [currentPage, setCurrentPage] = useState(1);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>(OutputFormat.JSON);
   const [transformedData, setTransformedData] = useState('');
@@ -23,65 +26,84 @@ export function TransformPage() {
   const { copy, copied } = useClipboard();
   const { toast } = useToast();
 
-  const handleFileUpload = (file: File) => {
+  const handleFileUpload = async (file: File) => {
     setUploadedFile(file);
     setIsUploading(true);
     setUploadProgress(0);
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          // Simulate data loading
-          setPreviewData(mockTableData);
-          generateTransformedData(OutputFormat.JSON);
-          return 100;
-        }
-        return prev + 10;
+    try {
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 15;
+        });
+      }, 200);
+
+      // Parse the file
+      const { rows } = await parseFile(file);
+      setUploadProgress(95);
+
+      // Set preview data
+      setPreviewData(rows);
+      setCurrentPage(1);
+
+      // Generate transformed data
+      const outputData = transformData(rows, { format: OutputFormat.JSON });
+      generateTransformedData(OutputFormat.JSON, rows);
+
+      // Save transformation to database
+      const fileType = getFileType(file.name);
+      await saveTransformation(
+        file.name,
+        fileType,
+        OutputFormat.JSON,
+        rows,
+        outputData
+      );
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      setIsUploading(false);
+
+      toast({
+        title: 'Success!',
+        description: `File uploaded and parsed successfully. ${rows.length} rows found.`,
       });
-    }, 200);
+    } catch (error) {
+      setIsUploading(false);
+      setUploadProgress(0);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to upload file',
+      });
+    }
   };
 
-  const generateTransformedData = (format: OutputFormat) => {
-    let output = '';
-    
-    switch (format) {
-      case OutputFormat.JSON:
-        output = JSON.stringify(previewData, null, 2);
-        break;
-      case OutputFormat.SQL_INSERT:
-        output = previewData.map(row => 
-          `INSERT INTO customers (id, name, email, age, joinDate, active) VALUES (${row.id}, '${row.name}', '${row.email}', ${row.age}, '${row.joinDate}', ${row.active});`
-        ).join('\n');
-        break;
-      case OutputFormat.SQL_CREATE_TABLE:
-        output = `CREATE TABLE customers (
-  id INT PRIMARY KEY,
-  name VARCHAR(255),
-  email VARCHAR(255),
-  age INT,
-  joinDate DATE,
-  active BOOLEAN
-);`;
-        break;
-      case OutputFormat.CSV:
-        const headers = Object.keys(previewData[0]).join(',');
-        const rows = previewData.map(row => Object.values(row).join(',')).join('\n');
-        output = `${headers}\n${rows}`;
-        break;
-      default:
-        output = JSON.stringify(previewData, null, 2);
+  const generateTransformedData = (format: OutputFormat, data: Record<string, any>[] = previewData) => {
+    if (data.length === 0) {
+      setTransformedData('');
+      return;
     }
-    
-    setTransformedData(output);
+
+    try {
+      const output = transformData(data, { format });
+      setTransformedData(output);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to transform data',
+      });
+    }
   };
 
   const handleFormatChange = (value: string) => {
     const format = value as OutputFormat;
     setOutputFormat(format);
-    generateTransformedData(format);
+    generateTransformedData(format, previewData);
   };
 
   const handleCopy = async () => {

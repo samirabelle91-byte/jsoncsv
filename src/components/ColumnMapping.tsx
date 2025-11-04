@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { GripVertical, X, Plus } from 'lucide-react';
 import { DataType } from '@/types/enums';
 import { formatDataType } from '@/types/formatters';

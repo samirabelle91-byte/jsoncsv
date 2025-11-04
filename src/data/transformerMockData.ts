@@ -65,7 +65,7 @@ export const mockUser = {
   id: 'user_123',
   email: 'user@example.com',
   name: 'John Doe',
-  plan: UserPlan.FREE,
+  plan: UserPlan.FREE as UserPlan,
   storageUsed: 52428800,
   storageLimit: 104857600,
   transformationsThisMonth: 45,

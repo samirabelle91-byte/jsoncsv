@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { User, Mail, Crown, HardDrive, Activity } from 'lucide-react';
+import { Crown, HardDrive, Activity } from 'lucide-react';
 import { mockUser, mockPricingPlans } from '@/data/transformerMockData';
 import { formatFileSize, formatUserPlan } from '@/types/formatters';
 import { UpgradeModal } from '@/components/UpgradeModal';

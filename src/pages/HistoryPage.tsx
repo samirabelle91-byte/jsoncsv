@@ -1,14 +1,44 @@
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileJson2, Database, FileTerminal, MoreVertical, Star } from 'lucide-react';
-import { mockTransformationHistory, mockSavedTemplates } from '@/data/transformerMockData';
+import { FileJson2, Database, FileTerminal, MoreVertical, Star, Loader2 } from 'lucide-react';
+import { mockSavedTemplates } from '@/data/transformerMockData';
 import { formatDate } from '@/types/formatters';
 import { OutputFormat, FileType } from '@/types/enums';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getTransformationHistory, deleteTransformation, type Transformation } from '@/services/transformationService';
 
 export function HistoryPage() {
+  const [history, setHistory] = useState<Transformation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getTransformationHistory();
+      setHistory(data);
+    } catch (error) {
+      console.error('Failed to load history:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteTransformation(id);
+      setHistory(history.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Failed to delete transformation:', error);
+    }
+  };
+
   const getFormatIcon = (format: OutputFormat | FileType) => {
     switch (format) {
       case OutputFormat.JSON:
@@ -41,44 +71,58 @@ export function HistoryPage() {
           <TabsContent value="history" className="mt-6">
             <ScrollArea className="h-[600px]">
               <div className="space-y-4">
-                {mockTransformationHistory.map((item) => (
-                  <Card key={item.id} className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4 flex-1">
-                        <div className="p-3 rounded-lg bg-primary-cyan/10">
-                          {getFormatIcon(item.inputFormat)}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="heading-sm mb-1">{item.fileName}</h3>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            <Badge variant="secondary">
-                              {item.inputFormat.toUpperCase()}
-                            </Badge>
-                            <span className="text-muted-foreground">→</span>
-                            <Badge variant="secondary">
-                              {item.outputFormat.replace('_', ' ').toUpperCase()}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap gap-4 body-sm text-muted-foreground">
-                            <span>{item.rowCount} rows</span>
-                            <span>{formatDate(item.timestamp)}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={item.status === 'complete' ? 'default' : 'secondary'}
-                          className="bg-success-green"
-                        >
-                          {item.status}
-                        </Badge>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : history.length === 0 ? (
+                  <Card className="p-12 text-center">
+                    <p className="text-muted-foreground">No transformations yet. Upload a file to get started!</p>
                   </Card>
-                ))}
+                ) : (
+                  history.map((item) => (
+                    <Card key={item.id} className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-4 flex-1">
+                          <div className="p-3 rounded-lg bg-primary-cyan/10">
+                            {getFormatIcon(item.input_format as FileType)}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="heading-sm mb-1">{item.file_name}</h3>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              <Badge variant="secondary">
+                                {item.input_format.toUpperCase()}
+                              </Badge>
+                              <span className="text-muted-foreground">→</span>
+                              <Badge variant="secondary">
+                                {item.output_format.replace('_', ' ').toUpperCase()}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-4 body-sm text-muted-foreground">
+                              <span>{item.row_count} rows</span>
+                              <span>{formatDate(new Date(item.created_at))}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={item.status === 'complete' ? 'default' : 'secondary'}
+                            className="bg-success-green"
+                          >
+                            {item.status}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                )}
               </div>
             </ScrollArea>
           </TabsContent>
